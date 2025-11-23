@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PioProgram.hpp"
+#include <cpp/LedStripWs2812b.hpp>
 
 #include <map>
 #include <pico/multicore.h>
@@ -290,7 +290,8 @@ private:
   static constexpr uint64_t TargetFrameTimeUs = 1000000 / TargetFPS;
   static constexpr float TargetFrameTimeSec = 1.0f / (float)TargetFPS;
   static Animator* ptr;
-  Ws2812bOutput leds_;
+  LedStripWs2812b leds_;
+  LEDBuffer buffer_;
   absolute_time_t nextFrameTime_;
   std::string baseAnimation_;
   std::string overlayAnimation_;
@@ -320,8 +321,9 @@ private:
     }
   }
 public:
-  Animator(uint pin, uint numLeds) :
-    leds_{ Ws2812bOutput::create(pin, numLeds) },
+  Animator(uint pin, uint numleds) :
+    leds_(pin),
+    buffer_(numleds),
     nextFrameTime_ { get_absolute_time() }
   {
     mutex_init(&mtx_);
@@ -427,13 +429,9 @@ public:
       {
         overlayAnimation_.clear();
       }
-      currentAnim()->update(leds_.buffer());
+      currentAnim()->update(buffer_);
     }
-    leds_.update();
-  }
-  Ws2812bOutput& leds()
-  {
-    return leds_;
+    leds_.writeColors(buffer_);
   }
 };
 

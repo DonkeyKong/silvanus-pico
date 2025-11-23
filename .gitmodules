@@ -1,0 +1,3 @@
+[submodule "deps/pi-pico-cpp"]
+	path = deps/pi-pico-cpp
+	url = https://github.com/DonkeyKong/pi-pico-cpp.git

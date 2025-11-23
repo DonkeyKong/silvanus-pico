@@ -1,10 +1,11 @@
-#include "PioProgram.hpp"
+#include <cpp/Button.hpp>
+#include <cpp/Color.hpp>
+#include <cpp/DiscreteOut.hpp>
+#include <cpp/FlashStorage.hpp>
+#include <cpp/WiFi.hpp>
+
 #include "Animation.hpp"
-#include "Button.hpp"
-#include "Color.hpp"
-#include "DiscreteOut.hpp"
 #include "Settings.hpp"
-#include "WiFi.h"
 
 #include <hardware/rtc.h>
 #include <hardware/watchdog.h>
@@ -34,7 +35,6 @@
 #define NTP_PORT 123
 #define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
 
-//Ws2812bOutput statusLeds = Ws2812bOutput::create(6, 8);
 Animator animator(6, 8);
 GPIOButton waterButton(0);
 GPIOButton lightButton(1, true);
@@ -344,18 +344,14 @@ bool setValFromStream(char* val, size_t len, std::istream& ss)
   return true;
 }
 
-void processCommand(std::string cmdAndArgs, Settings& settings)
+void processCommand(std::string cmdAndArgs, FlashStorage<Settings>& settingsMgr)
 {
+  Settings& settings = settingsMgr.data;
   std::stringstream ss(cmdAndArgs);
   std::string cmd;
   ss >> cmd;
   
-  
-  if (cmd == "autosave")
-  {
-    setValFromStream(settings.autosave, ss);
-  }
-  else if (cmd == "wifiSsid")
+  if (cmd == "wifiSsid")
   {
     setValFromStream(settings.wifiSsid, 256ul, ss);
   }
@@ -454,7 +450,7 @@ void processCommand(std::string cmdAndArgs, Settings& settings)
   else if (cmd == "flash")
   {
     // Write the settings to flash
-    if (settings.writeToFlash())
+    if (settingsMgr.writeToFlash())
       std::cout << "Wrote settings to flash!" << std::endl << std::flush;
     else
       std::cout << "Skipped writing to flash because contents were already correct." << std::endl << std::flush;
@@ -544,7 +540,7 @@ void processCommand(std::string cmdAndArgs, Settings& settings)
   }
 }
 
-void processStdIo(Settings& settings)
+void processStdIo(FlashStorage<Settings>& settingsMgr)
 {
   static char inBuf[1024];
   static int pos = 0;
@@ -561,7 +557,7 @@ void processStdIo(Settings& settings)
     {
       inBuf[pos] = '\0';
       std::cout << std::endl << std::flush; // echo to client
-      processCommand(inBuf, settings);
+      processCommand(inBuf, settingsMgr);
       pos = 0;
     }
     else
@@ -571,12 +567,12 @@ void processStdIo(Settings& settings)
   }
 }
 
-void processStdIoFor(Settings& settings, uint32_t milliseconds)
+void processStdIoFor(FlashStorage<Settings>& settingsMgr, uint32_t milliseconds)
 {
   absolute_time_t exitTime = make_timeout_time_ms(milliseconds);
   while (to_ms_since_boot(exitTime) > to_ms_since_boot(get_absolute_time()))
   {
-    processStdIo(settings);
+    processStdIo(settingsMgr);
     sleep_ms(50);
   }
 }
@@ -647,8 +643,25 @@ int main()
   sleep_ms(1000);
 
   // Init the settings object
-  SettingsManager settingsMgr;
-  Settings& settings = settingsMgr.getSettings();
+  FlashStorage<Settings> settingsMgr;
+  Settings& settings = settingsMgr.data;
+
+  // Read the current settings
+  std::cout << "Loading settings..." << std::endl << std::flush;
+  if (!settingsMgr.readFromFlash())
+  {
+    std::cout << "No valid settings found, loading defaults..." << std::endl << std::flush;
+    settings.setDefaults();
+  }
+  std::cout << "Load complete!" << std::endl << std::flush;
+
+  // Validate the current settings
+  std::cout << "Validating settings..." << std::endl << std::flush;
+  if (!settings.validateAll())
+  {
+    std::cout << "Some settings were invalid and had to be reset." << std::endl<< std::flush;
+  }
+  std::cout << "Validation complete!" << std::endl << std::flush;
 
   // Setup the animation system
   animator.addAnimation("idle", std::make_unique<SolidAnimation>(HSVColor{147.0f, 0.8f, 0.15f}.toRGB()));
@@ -673,17 +686,17 @@ int main()
     {
       if (reconnectTries < 5)
       {
-        processStdIoFor(settings, 5000);
+        processStdIoFor(settingsMgr, 5000);
       }
       else if (reconnectTries < 15)
       {
         wifiTimeout = 15000;
-        processStdIoFor(settings, 15000);
+        processStdIoFor(settingsMgr, 15000);
       }
       else
       {
         wifiTimeout = 30000;
-        processStdIoFor(settings, 60000);
+        processStdIoFor(settingsMgr, 60000);
       }
       reconnectTries++;
     }
@@ -724,7 +737,7 @@ int main()
     {
       if (to_ms_since_boot(evalTime) < to_ms_since_boot(pumpOffTimes[i]) && 
           to_ms_since_boot(pumpOffTimes[i]) > to_ms_since_boot(pumpOnTimes[i]) &&
-          settings.pump(i).enable)
+          settingsMgr.data.pump(i).enable)
       {
         wateringCycleRunning = true;
         float progress = (float)(to_ms_since_boot(evalTime)-to_ms_since_boot(pumpOnTimes[i])) / 
@@ -785,7 +798,7 @@ int main()
     }
 
     // Process input
-    processStdIo(settings);
+    processStdIo(settingsMgr);
 
     waterButton.update();
     if (waterButton.buttonUp())
@@ -835,17 +848,6 @@ int main()
       for (auto& light : lights)
       {
         light->set(!lightState);
-      }
-    }
-
-    // If configured to autosave, try to write settings to flash
-    // every frame. It'll only actually do it if the flash payload
-    // has changed and even then only once every 15 seconds.
-    if (settings.autosave)
-    {
-      if (settingsMgr.autosave())
-      {
-        std::cout << "autosaved settings to flash!" << std::endl << std::flush;
       }
     }
   }
