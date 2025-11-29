@@ -60,6 +60,7 @@ foreach(pio_file ${pio_files})
 endforeach()
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC "LOGGING_ENABLED")
+target_compile_definitions(${PROJECT_NAME} PUBLIC "ENABLE_PICO_MULTICORE")
 
 target_link_libraries(${PROJECT_NAME}
         pico_stdio 

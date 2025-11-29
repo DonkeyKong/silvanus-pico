@@ -24,7 +24,7 @@ struct Settings
   bool reserved; // not used, only here for backwards compatibility
   char wifiSsid[256];
   char wifiPassword[256]; // only wpa2-psk auth supported
-  float offsetFromUtc; // hours
+  float offsetFromUtc; // in hours
   PumpConfig pump1;
   PumpConfig pump2;
   PumpConfig pump3;

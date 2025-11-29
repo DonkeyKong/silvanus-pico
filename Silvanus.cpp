@@ -577,20 +577,6 @@ void processStdIoFor(FlashStorage<Settings>& settingsMgr, uint32_t milliseconds)
   }
 }
 
-// template <typename T>
-// bool withinRange(T val, T minEx, T maxInc)
-// {
-//   // Handle rollover
-//   if (minEx > maxInc)
-//   {
-//     return val > minEx || val <= maxInc;
-//   }
-//   else
-//   {
-//     return val > minEx && val <= maxInc;
-//   }
-// }
-
 bool withinRange(absolute_time_t val, absolute_time_t minEx, absolute_time_t maxInc)
 {
   return to_us_since_boot(val) > to_us_since_boot(minEx) && to_us_since_boot(val) <= to_us_since_boot(maxInc);
