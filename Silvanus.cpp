@@ -659,7 +659,10 @@ int main()
   animator.addAnimation("water-progress", std::make_unique<ProgressAnimation>(RGBColor{0, 0, 255}));
   animator.startUpdateThread();
 
+  // Configure button behavior
   lightButton.holdActivationRepeatMs(-1);
+  waterButton.debounce(2);
+  lightButton.debounce(2);
   
   // Try like crazy to establish a wifi connection and sync RTC
   bool rtcOk = false;
